@@ -73,7 +73,7 @@ class Config(NamedTuple):
         return hooks
 
     def _add_hook(self, hook: dict[Any, Any]) -> int:
-        #TODO: Actually installll, derp.  # noqa: E265
+        # TODO: Actually installll, derp.
         for repo in self.data['repos']:
             for _hook in repo['hooks']:
                 if hook['id'] in _hook['id']:
