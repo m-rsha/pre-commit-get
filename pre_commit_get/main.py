@@ -36,19 +36,6 @@ class Hook(NamedTuple):
         )
 
 
-def _get_all_hooks_yaml() -> dict[Any, Any]:
-    data = {}
-    try:
-        with open(ALL_HOOKS, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-            data = json.loads(''.join(line for line in lines))
-    except FileNotFoundError:
-        sys.stderr.write(f'Unable to find hooks file. \nTry running `{sys.argv[0]} update`\n')  # noqa: E501
-        raise SystemExit(1)
-
-    return data
-
-
 class Config(NamedTuple):
     data: dict[Any, Any]
 
@@ -83,7 +70,7 @@ class Config(NamedTuple):
         return 0
 
     def add_hooks(self, hook_names: list[str]) -> int:
-        all_hooks = _get_all_hooks_yaml()
+        all_hooks = get_all_hooks_json()
         for src, repos in all_hooks.items():
             for hook in repos:
                 for hook_name in hook_names:
@@ -117,17 +104,19 @@ def yaml_dump(o: Any, stream: TextIO = sys.stdout) -> None:
     yaml.safe_dump(o, stream, sort_keys=False, indent=4)
 
 
-def get_all_hooks() -> list[Hook]:
-    data = {}
+def get_all_hooks_json() -> dict[str, Any]:
     try:
-        with open(ALL_HOOKS, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-            data = json.loads(''.join(line for line in lines))
+        with open(ALL_HOOKS, encoding='utf-8') as f:
+            data = json.load(f)
     except FileNotFoundError:
-        sys.stderr.write(f'Unable to find hooks file. \nTry running `{sys.argv[0]} update`\n')  # noqa: E501
-        raise SystemExit(1)
+        raise SystemExit(f'Unable to find hooks file. \nTry running `{sys.argv[0]} update`\n')  # noqa: E501
 
-    all_hooks: list[Hook] = []
+    return data
+
+
+def get_all_hooks() -> list[Hook]:
+    data = get_all_hooks_json()
+    all_hooks = []
     for src, hooks in data.items():
         for hook in hooks:
             hook = Hook.create(hook, src=src)
@@ -137,11 +126,12 @@ def get_all_hooks() -> list[Hook]:
 
 
 def update_hook_list() -> int:
+    # TODO: Find an area in the home directory to store the hook list.
     req = urllib.request.Request(
         ALL_HOOKS_URL, headers={'User-Agent': 'pre-commit-get.py v0.0.1'},
     )
     with urllib.request.urlopen(req) as r:
-        with open(ALL_HOOKS, 'w+', encoding='utf-8') as f:
+        with open(ALL_HOOKS, 'w', encoding='utf-8') as f:
             f.writelines(line.decode() for line in r.readlines())
 
     print('Hook list updated, beep boop.')
@@ -149,21 +139,26 @@ def update_hook_list() -> int:
     return 0
 
 
-def list_hooks(hook_names: list[str]) -> int:
+def list_hooks(hook_name_parts: list[str]) -> int:
     all_hooks = get_all_hooks()
-    found_hooks = []
+    # TODO: Return only matches where all hook_name_parts are in hook.id
+    matching_hooks = set()
 
     for hook in all_hooks:
-        for hook_name in hook_names:
-            if hook_name in hook.id:
-                found_hooks.append(hook)
+        for part in hook_name_parts:
+            if part in hook.id:
+                matching_hooks.add(hook)
 
-    if len(found_hooks) == 0:
-        sys.stderr.write(f'Hook(s) not found: "{hook_names}"\nTry checking your spelling or updating your hook list with `{sys.argv[0]} update`.\n')  # noqa: E501
+    if len(matching_hooks) == 0:
+        not_found = ', '.join(part for part in hook_name_parts)
+        sys.stderr.write(f"Hook(s) not found: '{not_found}'\nTry checking your spelling or updating your hook list with `{sys.argv[0]} update`.\n")  # noqa: E501
         return 1
 
-    for hook in found_hooks:
-        print(f'{hook.id}: {hook.description} ({hook.src})')
+    for hook in matching_hooks:
+        if hook.description is not None:
+            print(f'{hook.id}: {hook.description} ({hook.src})')
+        else:
+            print(f'{hook.id} ({hook.src})')
 
     return 0
 
