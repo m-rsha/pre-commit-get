@@ -145,9 +145,8 @@ def list_hooks(hook_name_parts: list[str]) -> int:
     matching_hooks = set()
 
     for hook in all_hooks:
-        for part in hook_name_parts:
-            if part in hook.id:
-                matching_hooks.add(hook)
+        if all(part in hook.id for part in hook_name_parts):
+            matching_hooks.add(hook)
 
     if len(matching_hooks) == 0:
         not_found = ', '.join(part for part in hook_name_parts)
