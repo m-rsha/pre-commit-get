@@ -7,6 +7,7 @@ import sys
 import urllib.request
 from typing import Any
 from typing import NamedTuple
+from typing import Sequence
 from typing import TextIO
 
 import yaml
@@ -162,8 +163,8 @@ def list_all_hooks() -> int:
     return 0
 
 
-def main() -> int:
-    argv = sys.argv[1:]
+def main(argv: Sequence[str] | None = None) -> int:
+    argv = argv if argv is not None else sys.argv[1:]
     parser = argparse.ArgumentParser(
         description='Install hooks for pre-commit',
     )
