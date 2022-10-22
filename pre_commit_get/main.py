@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import urllib.request
 from typing import Any
@@ -10,6 +11,10 @@ from typing import TextIO
 
 import yaml
 
+from pre_commit_get.hook import Hook
+
+SafeLoader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
+SafeDumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)
 
 ALL_HOOKS = 'all-hooks.json'
 ALL_HOOKS_URL = 'https://pre-commit.com/all-hooks.json'
@@ -18,22 +23,13 @@ CONFIG = '.pre-commit-config.yaml'
 TEST_CONFIG = 'test-config.yaml'
 
 
-class Hook(NamedTuple):
-    src: str
-    id: str
-    name: str | None
-    description: str | None
-    args: list[str] | None
+def yaml_load(o: Any) -> dict[str, Any]:
+    return yaml.load(o, Loader=SafeLoader)
 
-    @classmethod
-    def create(cls, d: dict[Any, Any], *, src: str) -> Hook:
-        return cls(
-            src,
-            d['id'],
-            d.get('name'),
-            d.get('description'),
-            d.get('args'),
-        )
+
+def yaml_dump(o: Any, stream: TextIO = sys.stdout) -> None:
+    # TODO: Triple check how `default_flow_style` looks
+    yaml.dump(o, stream, Dumper=SafeDumper, sort_keys=False, indent=4)
 
 
 class Config(NamedTuple):
@@ -41,10 +37,9 @@ class Config(NamedTuple):
 
     @classmethod
     def load(cls, cfg: str = CONFIG) -> Config:
-        yaml_file = {}
         try:
-            with open(cfg, 'r', encoding='utf-8') as f:
-                yaml_file = yaml.safe_load(f)
+            with open(cfg, encoding='utf-8') as f:
+                yaml_file = yaml_load(f)
         except FileNotFoundError as e:
             sys.stderr.write(f'Unable to find pre-commit config: {e}\n')
             raise SystemExit(1)
@@ -100,10 +95,6 @@ class Config(NamedTuple):
         return 0
 
 
-def yaml_dump(o: Any, stream: TextIO = sys.stdout) -> None:
-    yaml.safe_dump(o, stream, sort_keys=False, indent=4)
-
-
 def get_all_hooks_json() -> dict[str, Any]:
     try:
         with open(ALL_HOOKS, encoding='utf-8') as f:
@@ -126,13 +117,17 @@ def get_all_hooks() -> list[Hook]:
 
 
 def update_hook_list() -> int:
-    # TODO: Find an area in the home directory to store the hook list.
+    # TODO: Figure out how to embed the program version inside the user-agent
+    cache_dir = os.path.join(os.path.expanduser('~/.cache'), 'pre-commit-get')
+    if not os.path.exists(cache_dir):
+        os.mkdir(cache_dir)
+    cache_file = os.path.join(cache_dir, ALL_HOOKS)
     req = urllib.request.Request(
-        ALL_HOOKS_URL, headers={'User-Agent': 'pre-commit-get.py v0.0.1'},
+        ALL_HOOKS_URL, headers={'User-Agent': 'pre-commit-get v0.0.1'},
     )
-    with urllib.request.urlopen(req) as r:
-        with open(ALL_HOOKS, 'w', encoding='utf-8') as f:
-            f.writelines(line.decode() for line in r.readlines())
+    with urllib.request.urlopen(req) as response:
+        with open(cache_file, 'wb') as f:
+            f.write(response.read())
 
     print('Hook list updated, beep boop.')
 
@@ -141,7 +136,6 @@ def update_hook_list() -> int:
 
 def list_hooks(hook_name_parts: list[str]) -> int:
     all_hooks = get_all_hooks()
-    # TODO: Return only matches where all hook_name_parts are in hook.id
     matching_hooks = set()
 
     for hook in all_hooks:
