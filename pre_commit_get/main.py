@@ -41,8 +41,7 @@ class Config(NamedTuple):
             with open(cfg, encoding='utf-8') as f:
                 yaml_file = yaml_load(f)
         except FileNotFoundError as e:
-            sys.stderr.write(f'Unable to find pre-commit config: {e}\n')
-            raise SystemExit(1)
+            raise SystemExit(f'Unable to find pre-commit config: {e}\n')
 
         return cls(yaml_file)
 
@@ -59,8 +58,7 @@ class Config(NamedTuple):
         for repo in self.data['repos']:
             for _hook in repo['hooks']:
                 if hook['id'] in _hook['id']:
-                    sys.stdout.write(f'Error: Hook already installed: {_hook["id"]}\n')  # noqa: E501
-                    raise SystemExit(1)
+                    raise SystemExit(f'Error: Hook already installed: {_hook["id"]}\n')  # noqa: E501
 
         return 0
 
