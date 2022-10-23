@@ -42,7 +42,7 @@ class Config(NamedTuple):
             with open(cfg, encoding='utf-8') as f:
                 yaml_file = yaml_load(f)
         except FileNotFoundError as e:
-            raise SystemExit(f'Unable to find pre-commit config: {e}\n')
+            raise SystemExit(f'Unable to find pre-commit config: {e}')
 
         return cls(yaml_file)
 
@@ -59,21 +59,32 @@ class Config(NamedTuple):
         for repo in self.data['repos']:
             for _hook in repo['hooks']:
                 if hook['id'] in _hook['id']:
-                    raise SystemExit(f'Error: Hook already installed: {_hook["id"]}\n')  # noqa: E501
+                    raise SystemExit(f'Error: Hook already installed: {_hook["id"]}')  # noqa: E501
 
         return 0
 
+    def _add_hook_by_name(self, name: str):
+        print('aaaaa make dis stuff work')
+        return
+
     def add_hooks(self, hook_names: list[str]) -> int:
         all_hooks = get_all_hooks_json()
+        matches = []
+
+        for hook_name in hook_names:
+            self._add_hook_by_name(hook_name)
+
         for src, repos in all_hooks.items():
             for hook in repos:
-                for hook_name in hook_names:
-                    # Perfect match: add
-                    if hook_name == hook['id']:
+                hook_id = hook['id']
+                if all(name in hook_id for name in hook_names):
+                    if any(name == hook_id for name in hook_names):
                         self._add_hook(hook)
-                    # Imperfect match: Heck you
-                    if hook_name in hook['id']:
-                        print(hook['id'])
+                    else:
+                        matches.append(hook)
+
+        for match in matches:
+            print(match['id'])
 
         return 0
 
@@ -99,7 +110,7 @@ def get_all_hooks_json() -> dict[str, Any]:
         with open(ALL_HOOKS, encoding='utf-8') as f:
             data = json.load(f)
     except FileNotFoundError:
-        raise SystemExit(f'Unable to find hooks file. \nTry running `{sys.argv[0]} update`\n')  # noqa: E501
+        raise SystemExit(f'Unable to find hooks file. \nTry running `{sys.argv[0]} update`')  # noqa: E501
 
     return data
 
@@ -135,11 +146,11 @@ def update_hook_list() -> int:
 
 def list_hooks(hook_name_parts: list[str]) -> int:
     all_hooks = get_all_hooks()
-    matching_hooks = set()
+    matching_hooks = []
 
     for hook in all_hooks:
         if all(part in hook.id for part in hook_name_parts):
-            matching_hooks.add(hook)
+            matching_hooks.append(hook)
 
     if len(matching_hooks) == 0:
         not_found = ', '.join(part for part in hook_name_parts)
@@ -209,9 +220,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return list_hooks(args.HOOK_NAME)
 
     config = Config.load()
-    if args.subcommand == 'add':
+    if args.subcommand in ('add', 'install'):
         return config.add_hooks(args.HOOK_NAMES)
-    elif args.subcommand == 'remove':
+    elif args.subcommand in ('remove', 'uninstall'):
         return config.remove_hooks(args.HOOK_NAMES)
     elif args.subcommand == 'list' and args.installed:
         hooks = config.get_hooks()
