@@ -7,19 +7,10 @@ from typing import Sequence
 from pre_commit_get.all_hooks import list_all_hooks
 from pre_commit_get.all_hooks import search_hooks
 from pre_commit_get.all_hooks import update_hook_list
-from pre_commit_get.schema import Config
-# from pre_commit_get.config import Config
-
-
-CONFIG = '.pre-commit-config.yaml'
-
-
-def list_installed_hooks(config: Config) -> int:
-    hooks = config.get_hooks()
-    for hook in hooks:
-        print(hook.id)
-
-    return 0
+from pre_commit_get.config import get_config
+from pre_commit_get.config import add_hook
+from pre_commit_get.config import remove_hook
+from pre_commit_get.config import get_installed_hooks
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -31,7 +22,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest='subcommand')
 
     subparsers.add_parser(
-        'add', aliases=['install'],
+        'install',
         help='Install a pre-commit hook by adding it to your .pre-commit-config.yaml file',  # noqa: E501
     ).add_argument('HOOK_NAMES', nargs='+')
 
@@ -40,7 +31,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     subparsers.add_parser(
-        'remove', aliases=['uninstall'],
+        'uninstall',
         help='Remove a hook from your .pre-commit-config.yaml file',
     ).add_argument('HOOK_NAMES', nargs='+')
 
@@ -67,13 +58,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif args.subcommand == 'search':
         return search_hooks(args.HOOK_NAME)
 
-    config = Config.load(CONFIG)
-    if args.subcommand in ('add', 'install'):
-        return config.add_hooks(args.HOOK_NAMES)
-    elif args.subcommand in ('remove', 'uninstall'):
-        return config.remove_hooks(args.HOOK_NAMES)
+    if args.subcommand == 'install':
+        for hook_name in args.HOOK_NAMES:
+            add_hook(hook_name)
+        return 0
+    elif args.subcommand == 'uninstall':
+        for hook_name in args.HOOK_NAMES:
+            remove_hook(hook_name)
+        return 0
     elif args.subcommand == 'list' and args.installed:
-        return list_installed_hooks(config)
+        for installed_hook in get_installed_hooks():
+            print(installed_hook)
+        return 0
 
     return 0
 
